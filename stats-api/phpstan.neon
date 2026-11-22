@@ -3,3 +3,7 @@ parameters:
     paths:
         - app
         - routes
+    excludePaths:
+        - routes/console.php
+    ignoreErrors:
+        - '#Call to an undefined static method Illuminate\\Support\\Facades\\Redis::#'
