@@ -1,5 +1,6 @@
 import json
 import os
+
 import psycopg
 import redis
 from fastapi import FastAPI
@@ -39,12 +40,11 @@ def read_menu():
     items = DEFAULT_MENU
     if dsn:
         try:
-            with psycopg.connect(dsn) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT id, name, price FROM menu_items ORDER BY id")
-                    rows = cur.fetchall()
-                    if rows:
-                        items = [{"id": r[0], "name": r[1], "price": r[2]} for r in rows]
+            with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+                cur.execute("SELECT id, name, price FROM menu_items ORDER BY id")
+                rows = cur.fetchall()
+                if rows:
+                    items = [{"id": r[0], "name": r[1], "price": r[2]} for r in rows]
         except psycopg.Error:
             pass
 

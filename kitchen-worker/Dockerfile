@@ -8,11 +8,11 @@ RUN mvn -B package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 ARG GIT_SHA=dev
 ENV GIT_SHA=${GIT_SHA}
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S -g 1001 appgroup && adduser -S -u 1001 appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/target/kitchen-worker-1.0.0.jar /app/worker.jar
 
-USER appuser
+USER 1001:1001
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
   CMD ["java", "-jar", "/app/worker.jar", "--healthcheck"]

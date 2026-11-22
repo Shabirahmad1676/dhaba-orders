@@ -12,12 +12,12 @@ ENV GIT_SHA=${GIT_SHA} \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+RUN groupadd --system --gid 1001 appgroup && useradd --system --uid 1001 --gid 1001 appuser
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY main.py .
 
-USER appuser
+USER 1001:1001
 EXPOSE 8000
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \

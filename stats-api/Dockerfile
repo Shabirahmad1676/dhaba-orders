@@ -13,19 +13,20 @@ ENV APP_ENV=production \
     REDIS_CLIENT=predis \
     GIT_SHA=${GIT_SHA}
 
+# hadolint ignore=DL3018
 RUN apk add --no-cache nginx \
-    && addgroup -S appgroup && adduser -S appuser -G appgroup
+    && addgroup -S -g 1001 appgroup && adduser -S -u 1001 appuser -G appgroup
 
 WORKDIR /var/www/html
 COPY --from=builder /app /var/www/html
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs bootstrap/cache \
+RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache \
     && APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= php artisan config:cache \
     && php artisan route:cache \
-    && chown -R appuser:appgroup /var/www/html /var/lib/nginx /var/log/nginx
+    && chown -R 1001:1001 /var/www/html /var/lib/nginx /var/log/nginx
 
-USER appuser
+USER 1001:1001
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \

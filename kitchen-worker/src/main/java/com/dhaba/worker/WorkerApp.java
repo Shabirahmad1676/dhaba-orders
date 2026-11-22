@@ -66,7 +66,7 @@ public class WorkerApp {
     }
 
     private static void processOrder(String dbUrl, int orderId) {
-        if (dbUrl.isEmpty()) return;
+        if (dbUrl.isEmpty()) { return; }
         try (Connection conn = DriverManager.getConnection(dbUrl);
              PreparedStatement ps = conn.prepareStatement("UPDATE orders SET status = ? WHERE id = ?")) {
             ps.setString(1, nextOrderStatus("new"));

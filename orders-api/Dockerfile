@@ -9,11 +9,11 @@ COPY main.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.Version=${GIT_SHA}" -o /orders-api .
 
 FROM alpine:3.21
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S -g 1001 appgroup && adduser -S -u 1001 appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /orders-api /app/orders-api
 
-USER appuser
+USER 1001:1001
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
