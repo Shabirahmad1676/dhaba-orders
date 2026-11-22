@@ -1,0 +1,123 @@
+name: CI Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    name: web (ESLint & Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  menu-api:
+    name: menu-api (Ruff & pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: menu-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: menu-api/requirements.txt
+      - run: pip install -r requirements.txt pytest httpx ruff
+      - run: ruff check .
+      - run: pytest -v
+
+  orders-api:
+    name: orders-api (golangci-lint & go test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: orders-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: orders-api/go.sum
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: orders-api
+      - run: go test -v ./...
+
+  kitchen-worker:
+    name: kitchen-worker (Checkstyle & JUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kitchen-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - run: mvn -B org.apache.maven.plugins:maven-checkstyle-plugin:3.6.0:check -Dcheckstyle.config.location=checkstyle.xml
+      - run: mvn -B test
+
+  stats-api:
+    name: stats-api (PHPStan & PHPUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: stats-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer
+          coverage: none
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: stats-api/vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('stats-api/composer.lock') }}
+          restore-keys: ${{ runner.os }}-php-
+      - run: composer install --no-interaction --prefer-dist
+      - run: ./vendor/bin/phpstan analyse --no-progress
+      - run: ./vendor/bin/phpunit
+
+  infra-lint:
+    name: Infrastructure Lint (hadolint, shellcheck, kubeconform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint Dockerfiles with hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+      - name: Lint shell scripts with shellcheck
+        run: |
+          if ls scripts/*.sh scripts/monitor/*.sh 1> /dev/null 2>&1; then
+            shellcheck scripts/*.sh scripts/monitor/*.sh
+          else
+            echo "No shell scripts yet"
+          fi
+      - name: Validate Kubernetes manifests with kubeconform
+        run: |
+          if [ -d "k8s" ] && [ "$(ls -A k8s)" ]; then
+            docker run --rm -v "$PWD":/workspace ghcr.io/yannh/kubeconform:latest -strict -ignore-missing-schemas /workspace/k8s
+          else
+            echo "No Kubernetes manifests yet"
+          fi
