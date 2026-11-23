@@ -1,154 +1,160 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import './App.css';
 
 export default function App() {
   const [menu, setMenu] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({ orders_per_minute: 0, top_dishes: [] });
-  const [statusMsg, setStatusMsg] = useState('');
-  const [orderingId, setOrderingId] = useState(null);
-  const [menuLoading, setMenuLoading] = useState(true);
-  const version = import.meta.env.VITE_GIT_SHA || 'dev';
+  const [quantities, setQuantities] = useState({});
+  const [submitting, setSubmitting] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [ordersRes, statsRes] = await Promise.all([
+        fetch('/api/orders'),
+        fetch('/api/stats'),
+      ]);
+      if (ordersRes.ok) {
+        const ordersData = await ordersRes.json();
+        if (Array.isArray(ordersData)) setOrders(ordersData);
+      }
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch {
+      // Ignore transient network errors during rolling updates
+    }
+  }, []);
 
   useEffect(() => {
     fetch('/api/menu')
-      .then((r) => r.json())
-      .then((d) => setMenu(d.items || []))
-      .catch(() => {})
-      .finally(() => setMenuLoading(false));
-
-    fetch('/api/stats')
-      .then((r) => r.json())
-      .then((d) => setStats(d))
+      .then((res) => res.json())
+      .then((data) => {
+        const items = data.items || [];
+        setMenu(items);
+        const initialQty = {};
+        items.forEach((item) => {
+          initialQty[item.id] = 1;
+        });
+        setQuantities(initialQty);
+      })
       .catch(() => {});
-  }, []);
 
-  const placeOrder = async (item) => {
-    setOrderingId(item.id);
-    setStatusMsg(`Ordering ${item.name}...`);
+    fetchData();
+    const interval = setInterval(fetchData, 2000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  const placeOrder = async (dish) => {
+    const quantity = Math.max(1, Number(quantities[dish.id] || 1));
+    setSubmitting(dish.id);
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item: item.name, quantity: 1 }),
+        body: JSON.stringify({ item: dish.name, quantity }),
       });
-      if (!res.ok) throw new Error('Order failed');
-      const data = await res.json();
-      setStatusMsg(`Order #${data.id} placed · ${data.status}`);
-    } catch {
-      setStatusMsg('Could not place your order. Please try again.');
+      if (res.ok) {
+        await fetchData();
+      }
     } finally {
-      setOrderingId(null);
+      setSubmitting(null);
     }
   };
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Dhaba Orders home">
-          <span className="brand-mark" aria-hidden="true">D</span>
-          <span>Dhaba Orders</span>
-        </a>
-        <div className="header-meta">
-          <span className="live-dot"><span /> Kitchen live</span>
-          <span className="build-badge">Build {version.slice(0, 7)}</span>
+    <div className="container">
+      <header className="header">
+        <div>
+          <h1>Dhaba Orders</h1>
+          <p>Live Kitchen &amp; Order Dispatch</p>
         </div>
       </header>
 
-      <main className="dashboard">
-        {statusMsg && (
-          <div className="toast" role="status">
-            <span className="toast-icon" aria-hidden="true">✓</span>
-            <span>{statusMsg}</span>
+      <section className="stats-bar">
+        <div className="stat-card">
+          <div className="stat-label">Orders / Minute</div>
+          <div className="stat-value">{stats.orders_per_minute ?? 0}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Recent Orders</div>
+          <div className="stat-value">{orders.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Popular Dishes</div>
+          <div className="stat-value" style={{ fontSize: '1rem', paddingTop: '0.3rem' }}>
+            {stats.top_dishes?.length ? stats.top_dishes.join(', ') : '—'}
           </div>
-        )}
+        </div>
+      </section>
 
-        <section className="hero">
-          <div>
-            <p className="eyebrow">Today&apos;s kitchen</p>
-            <h1>What&apos;s cooking?</h1>
-            <p className="hero-copy">Fresh from the tandoor. Pick your favourite and place an order.</p>
-          </div>
-          <div className="hero-stat">
-            <strong>{stats.orders_per_minute}</strong>
-            <span>orders / min</span>
+      <main className="grid">
+        <section className="panel">
+          <h2 className="panel-title">Menu</h2>
+          <div className="menu-list">
+            {menu.map((dish) => (
+              <div key={dish.id} className="menu-item">
+                <div>
+                  <div className="dish-name">{dish.name}</div>
+                  <div className="dish-price">PKR {dish.price}</div>
+                </div>
+                <div className="order-controls">
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    aria-label={`Quantity for ${dish.name}`}
+                    className="qty-input"
+                    value={quantities[dish.id] ?? 1}
+                    onChange={(e) =>
+                      setQuantities({ ...quantities, [dish.id]: e.target.value })
+                    }
+                  />
+                  <button
+                    className="btn"
+                    disabled={submitting === dish.id}
+                    onClick={() => placeOrder(dish)}
+                  >
+                    {submitting === dish.id ? 'Sending...' : 'Order'}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
-        <div className="content-grid">
-          <section className="menu-section" aria-labelledby="menu-heading">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Our selection</p>
-                <h2 id="menu-heading">Menu</h2>
-              </div>
-              <span className="item-count">{menu.length} items</span>
-            </div>
-
-            {menuLoading ? (
-              <div className="menu-grid" aria-label="Loading menu">
-                {[1, 2, 3].map((item) => <div className="menu-card skeleton" key={item} />)}
-              </div>
-            ) : (
-              <div className="menu-grid">
-                {menu.map((item, index) => (
-                  <article className="menu-card" key={item.id}>
-                    <div className="dish-number">0{index + 1}</div>
-                    <div className="dish-content">
-                      <h3>{item.name}</h3>
-                      <span className="price">Rs. {item.price}</span>
-                      <span className="sr-only">
-                        {item.name} — Rs. {item.price}
-                      </span>
+        <section className="panel">
+          <h2 className="panel-title">
+            <span>Live Orders</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 400 }}>
+              Auto-syncs every 2s
+            </span>
+          </h2>
+          {orders.length === 0 ? (
+            <div className="empty-state">No orders yet. Select a dish to place an order.</div>
+          ) : (
+            <div className="orders-list">
+              {orders.map((order) => (
+                <div key={order.id} className="order-row">
+                  <div>
+                    <div className="dish-name">
+                      #{order.id} · {order.item}
                     </div>
-                    <button
-                      type="button"
-                      className="order-button"
-                      onClick={() => placeOrder(item)}
-                      disabled={orderingId === item.id}
-                    >
-                      {orderingId === item.id ? 'Adding…' : 'Order'}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <aside className="stats-panel" aria-labelledby="stats-heading">
-            <div className="section-heading compact">
-              <div>
-                <p className="eyebrow">Right now</p>
-                <h2 id="stats-heading">Kitchen activity</h2>
-              </div>
+                    <div className="order-meta">Qty: {order.quantity || 1}</div>
+                  </div>
+                  <span
+                    className={`badge ${
+                      order.status === 'ready' ? 'badge-ready' : 'badge-new'
+                    }`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
+              ))}
             </div>
-
-            <div className="rate-card">
-              <span className="rate-label">Orders per minute</span>
-              <strong>{stats.orders_per_minute}</strong>
-              <div className="activity-bars" aria-hidden="true">
-                {[34, 54, 42, 68, 48, 82, 62, 92, 72, 88].map((height, index) => (
-                  <span key={index} style={{ height: `${height}%` }} />
-                ))}
-              </div>
-            </div>
-
-            <div className="top-dishes">
-              <h3>Popular today</h3>
-              {(stats.top_dishes || []).length ? (
-                <ol>
-                  {(stats.top_dishes || []).slice(0, 3).map((dish, index) => (
-                    <li key={dish}>
-                      <span className="rank">0{index + 1}</span>
-                      <span>{dish}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="empty-state">Waiting for kitchen activity</p>
-              )}
-            </div>
-          </aside>
-        </div>
+          )}
+        </section>
       </main>
     </div>
   );
