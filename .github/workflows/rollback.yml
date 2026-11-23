@@ -1,0 +1,29 @@
+name: Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to roll back'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Roll back target environment
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          TARGET_NS: ${{ inputs.environment }}
+        run: |
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+          kubectl rollout undo deployment -n "$TARGET_NS"
+          kubectl rollout status deployment -n "$TARGET_NS" --timeout=120s
+          [ -n "$SLACK_WEBHOOK_URL" ] && curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"⏪ MANUAL ROLLBACK executed on ${TARGET_NS} by ${{ github.actor }}\"}" \
+            "$SLACK_WEBHOOK_URL" || true

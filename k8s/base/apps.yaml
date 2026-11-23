@@ -1,0 +1,205 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: web:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: menu-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: menu-api
+  template:
+    metadata:
+      labels:
+        app: menu-api
+    spec:
+      containers:
+        - name: menu-api
+          image: menu-api:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: { name: dhaba-config }
+            - secretRef: { name: dhaba-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: menu-api
+spec:
+  selector:
+    app: menu-api
+  ports:
+    - port: 80
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-api
+  template:
+    metadata:
+      labels:
+        app: orders-api
+    spec:
+      containers:
+        - name: orders-api
+          image: orders-api:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: dhaba-config }
+            - secretRef: { name: dhaba-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-api
+spec:
+  selector:
+    app: orders-api
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stats-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: stats-api
+  template:
+    metadata:
+      labels:
+        app: stats-api
+    spec:
+      containers:
+        - name: stats-api
+          image: stats-api:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: dhaba-config }
+            - secretRef: { name: dhaba-secrets }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 300m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stats-api
+spec:
+  selector:
+    app: stats-api
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kitchen-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kitchen-worker
+  template:
+    metadata:
+      labels:
+        app: kitchen-worker
+    spec:
+      containers:
+        - name: kitchen-worker
+          image: kitchen-worker:v1
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef: { name: dhaba-config }
+            - secretRef: { name: dhaba-secrets }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 300m, memory: 384Mi }

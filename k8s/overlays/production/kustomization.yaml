@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: production
+resources:
+  - ../../base
+  - pdb.yaml
+replicas:
+  - name: web
+    count: 2
+  - name: menu-api
+    count: 2
+  - name: orders-api
+    count: 2
+  - name: stats-api
+    count: 2
+patches:
+  - target:
+      kind: Ingress
+      name: dhaba-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dhaba.test
+  - target:
+      kind: Deployment
+      name: orders-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/affinity
+        value:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: app
+                        operator: In
+                        values: [orders-api]
+                  topologyKey: kubernetes.io/hostname

@@ -1,0 +1,110 @@
+name: Build, Scan & Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      menu-api: ${{ steps.filter.outputs.menu-api }}
+      orders-api: ${{ steps.filter.outputs.orders-api }}
+      kitchen-worker: ${{ steps.filter.outputs.kitchen-worker }}
+      stats-api: ${{ steps.filter.outputs.stats-api }}
+      ops-monitor: ${{ steps.filter.outputs.ops-monitor }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            web: ['web/**']
+            menu-api: ['menu-api/**']
+            orders-api: ['orders-api/**']
+            kitchen-worker: ['kitchen-worker/**']
+            stats-api: ['stats-api/**']
+            ops-monitor: ['ops-monitor/**', 'scripts/monitor/**']
+
+  build-and-scan:
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.web == 'true' ||
+      needs.detect-changes.outputs.menu-api == 'true' ||
+      needs.detect-changes.outputs.orders-api == 'true' ||
+      needs.detect-changes.outputs.kitchen-worker == 'true' ||
+      needs.detect-changes.outputs.stats-api == 'true' ||
+      needs.detect-changes.outputs.ops-monitor == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [web, menu-api, orders-api, kitchen-worker, stats-api, ops-monitor]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and Trivy scan changed service
+        if: needs.detect-changes.outputs[matrix.service] == 'true'
+        run: |
+          CONTEXT="${{ matrix.service }}"
+          [ "${{ matrix.service }}" = "ops-monitor" ] && CONTEXT="."
+          docker build --build-arg GIT_SHA="${{ github.sha }}" \
+            -t "${{ matrix.service }}:${{ github.sha }}" \
+            -f "${{ matrix.service }}/Dockerfile" "$CONTEXT"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasecurity/trivy:latest image --exit-code 1 --severity CRITICAL --no-progress \
+            "${{ matrix.service }}:${{ github.sha }}"
+
+  deploy-staging:
+    needs: [detect-changes, build-and-scan]
+    if: always() && needs.build-and-scan.result != 'failure' && secrets.KUBECONFIG_B64 != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging with automatic rollback
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+          if kubectl apply -k k8s/overlays/staging && \
+             kubectl rollout status deployment -n staging --timeout=120s && \
+             ./scripts/smoke-test.sh http://staging.dhaba.test; then
+            STATUS="SUCCESS"
+          else
+            kubectl rollout undo deployment -n staging || true
+            STATUS="ROLLED_BACK"
+          fi
+          [ -n "$SLACK_WEBHOOK_URL" ] && curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"[STAGING] ${STATUS} commit=${{ github.sha }} by ${{ github.actor }}\"}" \
+            "$SLACK_WEBHOOK_URL" || true
+          [ "$STATUS" = "SUCCESS" ]
+
+  deploy-production:
+    needs: deploy-staging
+    if: secrets.KUBECONFIG_B64 != ''
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production with automatic rollback
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+          if kubectl apply -k k8s/overlays/production && \
+             kubectl rollout status deployment -n production --timeout=120s && \
+             ./scripts/smoke-test.sh http://dhaba.test; then
+            STATUS="SUCCESS"
+          else
+            kubectl rollout undo deployment -n production || true
+            STATUS="ROLLED_BACK"
+          fi
+          [ -n "$SLACK_WEBHOOK_URL" ] && curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"[PRODUCTION] ${STATUS} commit=${{ github.sha }} approved by ${{ github.actor }}\"}" \
+            "$SLACK_WEBHOOK_URL" || true
+          [ "$STATUS" = "SUCCESS" ]

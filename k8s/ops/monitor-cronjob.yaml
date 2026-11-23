@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ops-monitor-sa
+  namespace: ops
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ops-monitor-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "pods", "persistentvolumeclaims", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ops-monitor-reader-binding
+subjects:
+  - kind: ServiceAccount
+    name: ops-monitor-sa
+    namespace: ops
+roleRef:
+  kind: ClusterRole
+  name: ops-monitor-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-state-writer
+  namespace: ops
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-state-writer-binding
+  namespace: ops
+subjects:
+  - kind: ServiceAccount
+    name: ops-monitor-sa
+    namespace: ops
+roleRef:
+  kind: Role
+  name: ops-state-writer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-db-exec
+  namespace: staging
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-db-exec-staging
+  namespace: staging
+subjects:
+  - kind: ServiceAccount
+    name: ops-monitor-sa
+    namespace: ops
+roleRef:
+  kind: Role
+  name: ops-db-exec
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-db-exec
+  namespace: production
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["get", "list", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-db-exec-production
+  namespace: production
+subjects:
+  - kind: ServiceAccount
+    name: ops-monitor-sa
+    namespace: ops
+roleRef:
+  kind: Role
+  name: ops-db-exec
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ops-monitor
+  namespace: ops
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: ops-monitor-sa
+          restartPolicy: Never
+          containers:
+            - name: monitor
+              image: ops-monitor:v1
+              imagePullPolicy: IfNotPresent
+              envFrom:
+                - secretRef:
+                    name: alert-webhook
+                    optional: true
