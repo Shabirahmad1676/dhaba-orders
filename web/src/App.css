@@ -210,9 +210,36 @@ body {
   color: var(--new-text);
 }
 
+.badge-cooking {
+  background: #fff1d6;
+  color: #8a5700;
+}
+
 .badge-ready {
   background: var(--ready-bg);
   color: var(--ready-text);
+}
+
+.badge-failed {
+  background: #fde2e2;
+  color: #a32121;
+}
+
+.feedback {
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.feedback-success {
+  color: var(--ready-text);
+  background: var(--ready-bg);
+}
+
+.feedback-error {
+  color: #a32121;
+  background: #fde2e2;
 }
 
 .empty-state {
@@ -220,4 +247,9 @@ body {
   font-size: 0.9rem;
   text-align: center;
   padding: 2rem 0;
+}
+
+.badge-cooking {
+  background: #dbeafe;
+  color: #1e40af;
 }

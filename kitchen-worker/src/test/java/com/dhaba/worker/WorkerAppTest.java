@@ -10,4 +10,10 @@ class WorkerAppTest {
         assertEquals("ready", WorkerApp.nextOrderStatus("cooking"));
         assertEquals("ready", WorkerApp.nextOrderStatus("ready"));
     }
+
+    @Test
+    void testExtractOrderId() {
+        assertEquals(44, WorkerApp.extractOrderId("{\"id\":44,\"item\":\"Garlic Naan\",\"quantity\":1}"));
+        assertEquals(12, WorkerApp.extractOrderId("12"));
+    }
 }

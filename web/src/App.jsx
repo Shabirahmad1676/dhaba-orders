@@ -7,6 +7,7 @@ export default function App() {
   const [stats, setStats] = useState({ orders_per_minute: 0, top_dishes: [] });
   const [quantities, setQuantities] = useState({});
   const [submitting, setSubmitting] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -55,9 +56,18 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item: dish.name, quantity }),
       });
-      if (res.ok) {
-        await fetchData();
-      }
+      if (!res.ok) throw new Error('Order request failed');
+      const order = await res.json();
+      setFeedback({
+        type: 'success',
+        message: `Order #${order.id} accepted and added to the kitchen queue.`,
+      });
+      await fetchData();
+    } catch {
+      setFeedback({
+        type: 'error',
+        message: 'We could not send your order to the kitchen. Please try again.',
+      });
     } finally {
       setSubmitting(null);
     }
@@ -71,6 +81,12 @@ export default function App() {
           <p>Live Kitchen &amp; Order Dispatch</p>
         </div>
       </header>
+
+      {feedback && (
+        <p className={`feedback feedback-${feedback.type}`} role={feedback.type === 'error' ? 'alert' : 'status'}>
+          {feedback.message}
+        </p>
+      )}
 
       <section className="stats-bar">
         <div className="stat-card">
@@ -143,12 +159,13 @@ export default function App() {
                     </div>
                     <div className="order-meta">Qty: {order.quantity || 1}</div>
                   </div>
-                  <span
-                    className={`badge ${
-                      order.status === 'ready' ? 'badge-ready' : 'badge-new'
-                    }`}
-                  >
-                    {order.status}
+                  <span className={`badge badge-${order.status}`}>
+                    {{
+                      new: 'Queued',
+                      cooking: 'Preparing',
+                      ready: 'Ready',
+                      failed: 'Needs attention',
+                    }[order.status] || order.status}
                   </span>
                 </div>
               ))}

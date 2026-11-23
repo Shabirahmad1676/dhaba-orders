@@ -16,7 +16,12 @@ describe('Dhaba Web App', () => {
       if (target.includes('/api/orders')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([]),
+          json: () =>
+            Promise.resolve([
+              { id: 1, item: 'Chicken Karahi', quantity: 1, status: 'new' },
+              { id: 2, item: 'Mutton Shinwari', quantity: 1, status: 'cooking' },
+              { id: 3, item: 'Garlic Naan', quantity: 2, status: 'ready' },
+            ]),
         });
       }
       return Promise.resolve({
@@ -27,7 +32,10 @@ describe('Dhaba Web App', () => {
 
     render(<App />);
     expect(screen.getByText('Dhaba Orders')).toBeTruthy();
-    expect(await screen.findByText('Chicken Karahi')).toBeTruthy();
+    expect(await screen.findAllByText('Chicken Karahi')).not.toHaveLength(0);
     expect(await screen.findByText('PKR 1200')).toBeTruthy();
+    expect(await screen.findByText('Queued')).toBeTruthy();
+    expect(await screen.findByText('Preparing')).toBeTruthy();
+    expect(await screen.findByText('Ready')).toBeTruthy();
   });
 });
