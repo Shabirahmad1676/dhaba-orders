@@ -3,11 +3,30 @@ kind: Kustomization
 namespace: staging
 resources:
   - ../../base
+images:
+  - name: web
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/web
+    newTag: latest
+  - name: menu-api
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/menu-api
+    newTag: latest
+  - name: orders-api
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/orders-api
+    newTag: latest
+  - name: kitchen-worker
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/kitchen-worker
+    newTag: latest
+  - name: stats-api
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/stats-api
+    newTag: latest
 patches:
   - target:
       kind: Ingress
       name: dhaba-ingress
     patch: |-
+      - op: add
+        path: /spec/ingressClassName
+        value: nginx
       - op: replace
         path: /spec/rules/0/host
-        value: staging.dhaba.test
+        value: staging.13.200.64.245.nip.io

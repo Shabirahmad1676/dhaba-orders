@@ -1,29 +1,33 @@
-name: Manual Rollback
+name: Manual EKS Rollback
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment to roll back'
+        description: 'Target EKS namespace to roll back'
         required: true
         type: choice
         options:
           - staging
           - production
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   rollback:
     runs-on: ubuntu-latest
     steps:
-      - name: Roll back target environment
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Roll back target EKS namespace
         env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           TARGET_NS: ${{ inputs.environment }}
         run: |
-          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config
+          aws eks update-kubeconfig --name dhaba-eks --region "${{ secrets.AWS_REGION }}"
           kubectl rollout undo deployment -n "$TARGET_NS"
-          kubectl rollout status deployment -n "$TARGET_NS" --timeout=120s
-          [ -n "$SLACK_WEBHOOK_URL" ] && curl -s -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"⏪ MANUAL ROLLBACK executed on ${TARGET_NS} by ${{ github.actor }}\"}" \
-            "$SLACK_WEBHOOK_URL" || true
+          kubectl rollout status deployment -n "$TARGET_NS" --timeout=150s
+          echo "### ⏪ MANUAL ROLLBACK COMPLETED on \`${TARGET_NS}\` by ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"

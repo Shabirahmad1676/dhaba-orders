@@ -3,38 +3,30 @@ kind: Kustomization
 namespace: production
 resources:
   - ../../base
-  - pdb.yaml
-replicas:
+images:
   - name: web
-    count: 2
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/web
+    newTag: latest
   - name: menu-api
-    count: 2
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/menu-api
+    newTag: latest
   - name: orders-api
-    count: 2
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/orders-api
+    newTag: latest
+  - name: kitchen-worker
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/kitchen-worker
+    newTag: latest
   - name: stats-api
-    count: 2
+    newName: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/stats-api
+    newTag: latest
 patches:
   - target:
       kind: Ingress
       name: dhaba-ingress
     patch: |-
+      - op: add
+        path: /spec/ingressClassName
+        value: nginx
       - op: replace
         path: /spec/rules/0/host
-        value: dhaba.test
-  - target:
-      kind: Deployment
-      name: orders-api
-    patch: |-
-      - op: add
-        path: /spec/template/spec/affinity
-        value:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-              - weight: 100
-                podAffinityTerm:
-                  labelSelector:
-                    matchExpressions:
-                      - key: app
-                        operator: In
-                        values: [orders-api]
-                  topologyKey: kubernetes.io/hostname
+        value: dhaba.13.200.64.245.nip.io

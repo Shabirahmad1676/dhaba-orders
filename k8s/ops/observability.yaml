@@ -167,8 +167,9 @@ metadata:
   name: grafana-ingress
   namespace: ops
 spec:
+  ingressClassName: nginx
   rules:
-    - host: grafana.dhaba.test
+    - host: grafana.13.200.64.245.nip.io
       http:
         paths:
           - path: /

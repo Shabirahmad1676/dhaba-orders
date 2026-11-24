@@ -97,7 +97,7 @@ data:
           "type": "bargauge",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "gridPos": { "h": 7, "w": 12, "x": 0, "y": 12 },
-          "targets": [{ "expr": "sum(increase(traefik_service_requests_total{service=~\"production.*|staging.*\"}[15m])) by (service)", "legendFormat": "{{service}}" }]
+          "targets": [{ "expr": "sum(increase(traefik_service_requests_total{service=~\"production.*|staging.*\"}[15m])) by (ingress)", "legendFormat": "{{ingress}}" }]
         },
         {
           "id": 8,
