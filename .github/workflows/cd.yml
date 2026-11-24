@@ -68,7 +68,7 @@ jobs:
             -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" \
             -f "${{ matrix.service }}/Dockerfile" "$CONTEXT"
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasecurity/trivy:latest image --exit-code 1 --severity CRITICAL --no-progress \
+            ghcr.io/aquasecurity/trivy:latest image --exit-code 1 --severity CRITICAL --no-progress \
             "${IMAGE}:${{ github.sha }}"
           docker push "${IMAGE}:${{ github.sha }}"
           docker push "${IMAGE}:latest"
