@@ -119,7 +119,7 @@ spec:
           restartPolicy: Never
           containers:
             - name: monitor
-              image: ops-monitor:v1
+              image: 522355658937.dkr.ecr.ap-south-1.amazonaws.com/dhaba/ops-monitor:latest
               imagePullPolicy: IfNotPresent
               envFrom:
                 - secretRef:
